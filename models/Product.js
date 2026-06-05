@@ -6,7 +6,7 @@ const productSchema = new mongoose.Schema({
   category:    { type: String, required: true },
   location:    { type: String, required: true },
   description: { type: String, required: true },
-  image:       { type: String, default: 'https://via.placeholder.com/300' },
+  image: { type: String, default: '' },
   seller: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
