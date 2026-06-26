@@ -28,6 +28,22 @@ export const registerUser = async (req, res) => {
   }
 };
 
+export const getMe = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id).select('-password');
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    res.json({
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      rollNumber: user.rollNumber,
+      createdAt: user.createdAt,
+    });
+  } catch {
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
 export const loginUser = async (req, res) => {
   try {
     const { email, password } = req.body;
