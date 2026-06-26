@@ -7,6 +7,7 @@ const productSchema = new mongoose.Schema({
   location: { type: String, required: true },
   description: { type: String, required: true },
   image: { type: String, default: '' },
+  status: { type: String, enum: ['active', 'sold'], default: 'active' },
   seller: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
