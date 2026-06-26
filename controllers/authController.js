@@ -5,8 +5,10 @@ export const registerUser = async (req, res) => {
   try {
     const { name, email, rollNumber, password } = req.body;
     const userExists = await User.findOne({ email });
-
     if (userExists) return res.status(400).json({ message: 'User already exists' });
+
+    const rollExists = await User.findOne({ rollNumber });
+    if (rollExists) return res.status(400).json({ message: 'Roll number already registered' });
 
     const user = await User.create({ name, email, rollNumber, password });
     res.status(201).json({
