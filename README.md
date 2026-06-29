@@ -1,177 +1,144 @@
-# ⚙️ KGP Marketplace — Backend
+# Campus Marketplace - Backend
 
-<div align="center">
+Node and Express server for a campus buy and sell marketplace with real-time chat.
+It handles user accounts, product listings, and live messaging between buyers and
+sellers, with listings and chat stored in MongoDB. Authentication is JWT based.
 
-![KGP Marketplace](https://img.shields.io/badge/KGP-Marketplace-1e3a8a?style=for-the-badge&logo=node.js&logoColor=white)
-![Node.js](https://img.shields.io/badge/Node.js-18-339933?style=for-the-badge&logo=node.js&logoColor=white)
-![Express](https://img.shields.io/badge/Express-4-000000?style=for-the-badge&logo=express&logoColor=white)
-![MongoDB](https://img.shields.io/badge/MongoDB-Atlas-47A248?style=for-the-badge&logo=mongodb&logoColor=white)
-![Socket.io](https://img.shields.io/badge/Socket.io-4-010101?style=for-the-badge&logo=socket.io&logoColor=white)
+This is the backend repo. The React frontend is in a separate repository.
 
-**REST API + WebSocket server for the KGP Marketplace**
+## Tech stack
 
-[🌐 Frontend Live Demo](https://kgp-makertplace-frontend.vercel.app/) · [💻 Frontend Repo](https://github.com/Abhi27-27/KGP-Makertplace-Frontend) · [🐛 Report Bug](https://github.com/Abhi27-27/KGP-Makertplace-backend/issues)
+- Node.js with Express
+- Socket.io for real-time chat
+- MongoDB with Mongoose
+- JSON Web Tokens for auth, bcryptjs for password hashing
+- cors
 
-</div>
+## How it works
 
----
+Listings are normal REST resources. The chat is the real-time part and runs over
+Socket.io.
 
-## 📌 Overview
-
-This is the **Node.js/Express backend** for KGP Marketplace — a peer-to-peer campus marketplace for IIT Kharagpur students. It provides a REST API for authentication, product listings, and chat, along with a real-time WebSocket layer via Socket.io.
-
----
-
-## 🔗 Frontend
-
-> **Live App:** [https://kgp-makertplace-frontend.vercel.app/](https://kgp-makertplace-frontend.vercel.app/)
->
-> **Frontend Repository:** [https://github.com/Abhi27-27/KGP-Makertplace-Frontend](https://github.com/Abhi27-27/KGP-Makertplace-Frontend)
-
----
-
-## ✨ Features
-
-- 🔐 **JWT Authentication** — Stateless auth with 30-day tokens and bcrypt password hashing
-- 🛍️ **Product CRUD** — Create, read, and delete listings with seller authorization checks
-- 💬 **Real-Time Chat** — Socket.io messaging with room-based delivery per user
-- 📬 **Unread Message Tracking** — Per-conversation unread counts with mark-as-read support
-- 🔔 **Chat Notifications** — Server-side push events for new messages to offline-tab recipients
-- 🔑 **Route Protection** — Middleware-based auth guard on all protected endpoints
-- 🗄️ **MongoDB** — Mongoose schemas with participant key deduplication for conversations
-
----
-
-## 🛠️ Tech Stack
-
-| Category | Technology |
-|---|---|
-| Runtime | Node.js 18 (ESM) |
-| Framework | Express.js 4 |
-| Database | MongoDB + Mongoose |
-| Real-Time | Socket.io 4 |
-| Auth | JWT + bcryptjs |
-| Environment | dotenv |
-
----
-
-## 📁 Project Structure
+When a buyer messages a seller about an item, the server finds the existing
+conversation for that buyer, seller and item, or creates one if it does not exist.
+Each connected user is placed in a personal room named by their user id, so a new
+message is delivered straight to both people's rooms and appears instantly.
 
 ```
-├── server.js               # Entry point — HTTP + Socket.io server
-├── app.js                  # Express app, middleware, routes
-├── config/
-│   └── db.js               # MongoDB connection
-├── routes/
-│   ├── index.js            # Route aggregator (/api)
-│   ├── authRoutes.js       # POST /auth/register, /auth/login
-│   ├── productRoutes.js    # GET/POST/DELETE /products
-│   └── chatRoutes.js       # GET/POST /chat/conversations, /messages
-├── controllers/
-│   ├── authController.js   # Register & login logic
-│   ├── productController.js# CRUD for listings
-│   └── chatController.js   # Conversations, messages, unread count
-├── middleware/
-│   ├── authMiddleware.js   # protect (HTTP) + socketAuth (WS)
-│   └── errorHandler.js     # Global error handler
-├── models/
-│   ├── User.js             # name, email, rollNumber, password (hashed)
-│   ├── Product.js          # title, price, category, location, seller ref
-│   ├── Conversation.js     # participants[], product ref, participantKey
-│   └── Message.js          # conversation ref, sender ref, text, read
-├── socket/
-│   └── socketHandler.js    # send_message, mark_read socket events
-└── utils/
-    └── generateToken.js    # JWT sign helper
+buyer sends a message
+    -> the server saves it and updates the conversation
+    -> it is delivered to the buyer's and the seller's personal rooms
+    -> the seller also gets a notification event and an unread count bump
 ```
 
----
+Two details worth knowing:
 
-## 🔌 API Reference
+There is never a duplicate chat thread. Each conversation has a key built from the
+two user ids (sorted, so the order does not matter) plus the product id, and that key
+has a unique index in MongoDB. So the same buyer, seller and item always map to one
+thread.
 
-### Auth
+Unread counts are real, not guessed. The server counts messages in a conversation
+that you did not send and have not read yet. Opening a conversation marks them read.
 
-| Method | Endpoint | Description | Auth |
-|---|---|---|---|
-| POST | `/api/auth/register` | Register a new student | ❌ |
-| POST | `/api/auth/login` | Login and receive JWT | ❌ |
+Only the seller can manage their own listing. Before any edit, delete or mark-as-sold,
+the server checks that the logged-in user is the item's seller.
 
-### Products
+## Project structure
 
-| Method | Endpoint | Description | Auth |
-|---|---|---|---|
-| GET | `/api/products` | Get all listings | ❌ |
-| GET | `/api/products/:id` | Get single listing | ❌ |
-| GET | `/api/products/user/:userId` | Get your listings | ✅ |
-| POST | `/api/products` | Create a listing | ✅ |
-| DELETE | `/api/products/:id` | Delete your listing | ✅ |
+```
+backend/
+  server.js                  HTTP server, Socket.io setup, DB connect
+  app.js                     Express app, CORS, routes, error handler
+  config/
+    db.js                    Mongoose connection
+  models/
+    User.js                  account details, hashed password
+    Product.js               listing fields, status (active or sold), seller
+    Conversation.js          participants, product, unique participant key
+    Message.js               conversation, sender, text, read flag
+  controllers/
+    authController.js        register, login, current user
+    productController.js     list, get, create, update, delete
+    chatController.js        conversations, messages, unread count
+  middleware/
+    authMiddleware.js        protect (HTTP token) and socket auth (socket token)
+    errorHandler.js
+  socket/
+    socketHandler.js         the chat socket events
+  routes/
+    index.js                 combines the route files
+    authRoutes.js
+    productRoutes.js
+    chatRoutes.js
+  utils/
+    generateToken.js         signs a 30 day JWT
+```
 
-### Chat
+## Socket events
 
-| Method | Endpoint | Description | Auth |
-|---|---|---|---|
-| GET | `/api/chat/conversations` | List all conversations | ✅ |
-| POST | `/api/chat/conversations` | Start/get conversation | ✅ |
-| GET | `/api/chat/conversations/:id/messages` | Get messages | ✅ |
-| GET | `/api/chat/unread` | Get total unread count | ✅ |
+```
+send_message      validate, save, deliver to both users, notify the recipient
+mark_read         mark a conversation's messages as read
+disconnect        cleanup
+```
 
-### WebSocket Events
+## API routes
 
-| Event | Direction | Payload |
-|---|---|---|
-| `send_message` | Client → Server | `{ conversationId, text }` |
-| `new_message` | Server → Client | `{ message, conversationId }` |
-| `mark_read` | Client → Server | `{ conversationId }` |
-| `messages_read` | Server → Client | `{ conversationId }` |
-| `chat_notification` | Server → Client | `{ message, senderName }` |
+Auth:
 
----
+```
+POST /api/auth/register
+POST /api/auth/login
+GET  /api/auth/me            (token required)
+```
 
-## ⚙️ Getting Started
+Products:
+
+```
+GET    /api/products             browse active listings
+GET    /api/products/user/:id    a user's listings (token required)
+GET    /api/products/:id         one listing
+POST   /api/products             create (token required)
+PUT    /api/products/:id         update, including marking sold (token required)
+DELETE /api/products/:id         delete (token required)
+```
+
+Chat (token required):
+
+```
+GET  /api/chat/conversations               list conversations with unread counts
+POST /api/chat/conversations               find or create a conversation
+GET  /api/chat/conversations/:id/messages  messages in a conversation
+GET  /api/chat/unread                      total unread count
+```
+
+## Getting started
 
 ### Prerequisites
 
-- Node.js v18+
-- MongoDB Atlas account (or local MongoDB)
+- Node.js 18 or newer
+- A MongoDB database (local or a free Atlas cluster)
 
-### Installation
+### Install and run
 
 ```bash
-# 1. Clone the repository
-git clone https://github.com/Abhi27-27/KGP-Makertplace-backend.git
-cd KGP-Makertplace-backend
-
-# 2. Install dependencies
 npm install
-
-# 3. Create environment file
-cp .env.example .env
+npm run dev
 ```
 
-### Environment Variables
+### Environment variables
 
-Create a `.env` file in the root:
+Create a `.env` file in the backend root:
 
 ```env
 PORT=5000
-MONGO_URI=mongodb+srv://<username>:<password>@cluster.mongodb.net/kgp-marketplace
-JWT_SECRET=your_super_secret_jwt_key
+MONGO_URI=your_mongodb_connection_string
+JWT_SECRET=any_long_random_string
 ```
 
-### Run Locally
+## Deployment
 
-```bash
-# Development (with nodemon)
-npm run dev
-
-# Production
-npm start
-```
-
-Server runs at `http://localhost:5000`
-
----
-
-<div align="center">
-Made by <a href="https://github.com/Abhi27-27">Marreddy Abhiram Muni Reddy</a> · IIT Kharagpur
-</div>
+The backend runs on any Node host such as Render or Railway. Set the same
+environment variables there, allow the frontend's URL in the CORS settings, and use a
+host that supports WebSocket connections for the chat.
